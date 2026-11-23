@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>صمّم شنطة الخرز الخشب</title>
+<style>
+:root{--bg:#faf6ef;--card:#fff;--tx:#2b2118;--mut:#7a6a5a;--bd:#e4d9c8;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1c1712;--card:#2a231b;--tx:#f3ebdf;--mut:#b5a692;--bd:#443a2d}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:"Segoe UI",Tahoma,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:16px;display:grid;gap:16px;grid-template-columns:1fr}
+@media(min-width:800px){.wrap{grid-template-columns:1fr 320px;align-items:start}}
+h1{font-size:22px;margin:0 0 4px}p.s{margin:0;color:var(--mut);font-size:14px}
+header{grid-column:1/-1}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px}
+#stage{position:relative;aspect-ratio:1/1.1;overflow:hidden;touch-action:none;cursor:grab;padding:0}#stage canvas{position:absolute;inset:0;display:block}
+.bead{cursor:pointer;stroke:rgba(0,0,0,.25);stroke-width:1}
+.bead:hover{stroke:var(--tx);stroke-width:2.5}
+h2{font-size:15px;margin:0 0 10px}
+.sw{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.sw button{aspect-ratio:1;border-radius:50%;border:2px solid var(--bd);cursor:pointer;padding:0}
+.sw button.on{outline:3px solid var(--tx);outline-offset:2px}
+.modes{display:flex;gap:6px;flex-wrap:wrap}
+.modes button,.act button{font:inherit;font-size:14px;padding:8px 12px;border-radius:10px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);cursor:pointer}
+.modes button.on{background:var(--tx);color:var(--bg)}
+.act{display:flex;gap:6px;flex-wrap:wrap}
+.cur{display:flex;align-items:center;gap:10px}
+.cur input{width:48px;height:40px;border:none;background:none;padding:0;cursor:pointer}
+.side{display:grid;gap:12px}
+.hint{position:absolute;bottom:8px;inset-inline:0;text-align:center;font-size:12px;color:var(--mut);pointer-events:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><h1>صمّم شنطة الخرز الخشب</h1><p class="s">شنطة زي كيس الفلوس بسوستة من فوق وستريب من ناحية اليمين. لفّها بالسحب، وقرّب وابعد بالعجلة أو الأزرار. اختار لون ودوس على أي خرزة. الأبعاد بالسنتيمتر.</p></header>
+<div class="card" id="stage"><div class="hint">اسحب عشان تلف الشنطة</div></div>
+<div class="side">
+<div class="card"><h2>الشنطة</h2><div class="modes" id="bags"></div>
+<div class="cur" style="margin-top:12px"><label style="font-size:14px">قطر الخرزة (سم)</label><input type="number" id="bd" value="1" min="0.5" max="3" step="0.1" style="width:70px;height:34px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);padding:0 6px"></div>
+<p class="s" id="cnt" style="margin-top:8px"></p></div>
+<div class="card"><h2>اللون</h2><div class="sw" id="sw"></div>
+<div class="cur" style="margin-top:12px"><input type="color" id="cp" value="#c0392b" aria-label="لون مخصص"><span style="font-size:14px">لون مخصص</span></div></div>
+<div class="card"><h2>بتلوّن إيه؟</h2><div class="modes" id="modes">
+<button data-m="bead" class="on">خرزة</button><button data-m="row">صف</button><button data-m="col">عمود</button><button data-m="part">الجزء كله</button><button data-m="all">الكل</button></div>
+<p class="s" style="margin-top:8px">الجزء = وش، ضهر، جنب، قاع، أو الستريب.</p></div>
+<div class="card act"><button id="undo">تراجع</button><button id="rnd">عشوائي</button><button id="rst">كله سادة</button><button id="zi">قرّب +</button><button id="zo">ابعد −</button><button id="png">حفظ صورة</button></div>
+</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+var PLAIN="#d8b98a";
+var COLORS=["#d8b98a","#8b5a2b","#5a3a1e","#c0392b","#e67e22","#f1c40f","#8bc34a","#2e7d32","#16a085","#3498db","#1f4e9c","#6c3fb5","#e91e8c","#f4a6b7","#ffffff","#222222","#b0b0b0","#800020","#40c4c4","#e8d9a8"];
+var BAGS=[{n:"الشنطة 1",w:20,h:15,d:2,sw:1,sl:30},{n:"الشنطة 2",w:35,h:20,d:3,sw:4,sl:100}];
+var cur=COLORS[3],mode="bead",bag=0,beads=[],S,saved={},mesh,zip,tx=0,yaw=.55,pitch=.25,dist=60,ty=15,tc=new THREE.Color();
+var box=document.getElementById("stage"),cv;
+var R=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});cv=R.domElement;box.insertBefore(cv,box.firstChild);
+var scene=new THREE.Scene(),cam=new THREE.PerspectiveCamera(40,1,.1,2000);
+scene.add(new THREE.HemisphereLight(0xffffff,0x7a6a5a,.95));scene.add(cam);
+var dl=new THREE.DirectionalLight(0xffffff,.75);dl.position.set(.6,1,1);cam.add(dl);
+function draw(){cam.position.set(tx+dist*Math.sin(yaw)*Math.cos(pitch),ty+dist*Math.sin(pitch),dist*Math.cos(yaw)*Math.cos(pitch));cam.lookAt(tx,ty,0);R.render(scene,cam)}
+function size(){var w=box.clientWidth,h=box.clientHeight;R.setPixelRatio(Math.min(2,window.devicePixelRatio||1));R.setSize(w,h);cam.aspect=w/h;cam.updateProjectionMatrix();draw()}
+window.addEventListener("resize",size);
+function bsz(){var v=parseFloat(document.getElementById("bd").value);return v>=0.5?v:1}
+function P(g,row,col,x,y,z){beads.push({g:g,row:row,col:col,x:x,y:y,z:z,i:beads.length})}
+function path(h,n,nr,x0,x1){var p=[],L=0,px,py;for(var i=0;i<=n;i++){var t=i/n,x=x0+(x1-x0)*t,y=nr+h*Math.sin(Math.PI*t);if(i)L+=Math.hypot(x-px,y-py);p.push([x,y,L]);px=x;py=y}return p}
+function build(){var B=BAGS[bag],d=bsz();S=saved[bag];if(!S||S.d!==d)S=saved[bag]={d:d,cols:[],hist:[]};
+var nc=Math.round(B.w/d),nr=Math.round(B.h/d),nd=Math.max(2,Math.round(B.d/d)),sw=Math.max(1,Math.round(B.sw/d)),sl=Math.round(B.sl/d);beads=[];
+var zf=(nd-1)/2,xe=(nc-1)/2,r,c,k,j;
+for(r=0;r<nr;r++){var y=nr-1-r+.5;for(c=0;c<nc;c++){var x=c-xe;P("f",r,c,x,y,zf);P("k",r,c,x,y,-zf)}
+for(c=1;c<nd-1;c++){var z=c-zf;P("l",r,c,-xe,y,z);P("r",r,c,xe,y,z)}}
+for(r=1;r<nd-1;r++)for(c=1;c<nc-1;c++)P("u",r,c,c-xe,.5,r-zf);
+var yt=nr-.5,x0=xe+1,rat=2.2,np=720;
+function el(a,b){var o=[],L=0,px,py;for(var i=0;i<=np;i++){var t=Math.PI+2*Math.PI*i/np,x=a*Math.cos(t),y=b*Math.sin(t);if(i)L+=Math.hypot(x-px,y-py);o.push([x,y,L]);px=x;py=y}return o}
+var sc=sl/el(rat,1)[np][2],ea=rat*sc,eb=sc,pt=el(ea,eb),q=0,tot=pt[np][2];
+for(k=0;k<sl;k++){var s=(k+.5)*tot/sl;while(q<np-1&&pt[q+1][2]<s)q++;var f=(s-pt[q][2])/((pt[q+1][2]-pt[q][2])||1),sx=x0+ea+pt[q][0]+(pt[q+1][0]-pt[q][0])*f,sy=yt+pt[q][1]+(pt[q+1][1]-pt[q][1])*f;for(j=0;j<sw;j++)P("s",j,k,sx,sy,j-(sw-1)/2)}
+var ymin=Math.min(0,yt-eb),ymax=Math.max(nr,yt+eb+.5),xmax=x0+2*ea+.5;
+ty=(ymin+ymax)/2;tx=(xmax-nc/2)/2;dist=Math.max(ymax-ymin,xmax+nc/2,nd)*1.9;
+if(mesh){scene.remove(mesh);mesh.geometry.dispose()}
+mesh=new THREE.InstancedMesh(new THREE.SphereGeometry(.485,16,12),new THREE.MeshStandardMaterial({roughness:.55}),beads.length);
+var m=new THREE.Matrix4();beads.forEach(function(b){m.setPosition(b.x,b.y,b.z);mesh.setMatrixAt(b.i,m);mesh.setColorAt(b.i,tc.set(S.cols[b.i]||PLAIN))});
+mesh.instanceColor.needsUpdate=true;scene.add(mesh);
+if(zip)scene.remove(zip);zip=new THREE.Group();
+var zb=new THREE.Mesh(new THREE.BoxGeometry(nc,.3,nd*.9),new THREE.MeshStandardMaterial({color:0x777777,metalness:.6,roughness:.4}));zb.position.set(0,nr+.15,0);zip.add(zb);
+var zp=new THREE.Mesh(new THREE.BoxGeometry(.9,1.2,.6),new THREE.MeshStandardMaterial({color:0xc9a227,metalness:.8,roughness:.3}));zp.position.set(xe-1,nr+.6,0);zip.add(zp);scene.add(zip);
+document.getElementById("cnt").textContent="الجسم: "+nc+" عرض × "+nr+" ارتفاع × "+nd+" عمق · الستريب: "+sw+" × "+sl+" · الإجمالي "+beads.length+" خرزة";draw()}
+function apply(l,c){S.hist.push(JSON.stringify(S.cols));l.forEach(function(b){S.cols[b.i]=c;mesh.setColorAt(b.i,tc.set(c))});mesh.instanceColor.needsUpdate=true;draw()}
+function refresh(){beads.forEach(function(b){mesh.setColorAt(b.i,tc.set(S.cols[b.i]||PLAIN))});mesh.instanceColor.needsUpdate=true;draw()}
+var ray=new THREE.Raycaster(),dn=null;
+function pick(e){var r=cv.getBoundingClientRect();ray.setFromCamera(new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1),cam);var h=ray.intersectObject(mesh);if(!h.length)return;
+var b=beads[h[0].instanceId],l;if(mode==="bead")l=[b];else if(mode==="row")l=beads.filter(function(x){return x.g===b.g&&x.row===b.row});
+else if(mode==="col")l=beads.filter(function(x){return x.g===b.g&&x.col===b.col});else if(mode==="part")l=beads.filter(function(x){return x.g===b.g});else l=beads;apply(l,cur)}
+cv.addEventListener("pointerdown",function(e){dn={x:e.clientX,y:e.clientY,yaw:yaw,pitch:pitch,mv:0};cv.setPointerCapture(e.pointerId)});
+cv.addEventListener("pointermove",function(e){if(!dn)return;var dx=e.clientX-dn.x,dy=e.clientY-dn.y;dn.mv=Math.max(dn.mv,Math.hypot(dx,dy));if(dn.mv>5){yaw=dn.yaw-dx*.008;pitch=Math.max(-.5,Math.min(1.4,dn.pitch+dy*.008));draw()}});
+cv.addEventListener("pointerup",function(e){if(dn&&dn.mv<=5)pick(e);dn=null});
+cv.addEventListener("wheel",function(e){e.preventDefault();zoom(e.deltaY>0?1.1:.9)},{passive:false});
+function zoom(f){dist=Math.max(5,Math.min(500,dist*f));draw()}
+document.getElementById("zi").onclick=function(){zoom(.85)};document.getElementById("zo").onclick=function(){zoom(1.18)};
+var bg=document.getElementById("bags");
+BAGS.forEach(function(B,i){var b=document.createElement("button");b.textContent=B.n+" ("+B.h+"×"+B.w+")";b.className=i?"":"on";b.onclick=function(){bag=i;[].forEach.call(bg.children,function(x,j){x.className=j===i?"on":""});build()};bg.appendChild(b)});
+document.getElementById("bd").onchange=build;
+var sw=document.getElementById("sw");
+COLORS.forEach(function(c){var b=document.createElement("button");b.style.background=c;b.setAttribute("aria-label",c);if(c===cur)b.className="on";b.onclick=function(){cur=c;[].forEach.call(sw.children,function(x,i){x.className=COLORS[i]===c?"on":""})};sw.appendChild(b)});
+document.getElementById("cp").oninput=function(){cur=this.value;[].forEach.call(sw.children,function(x){x.className=""})};
+document.getElementById("modes").onclick=function(e){var m=e.target.getAttribute("data-m");if(!m)return;mode=m;[].forEach.call(this.children,function(x){x.className=x.getAttribute("data-m")===m?"on":""})};
+document.getElementById("undo").onclick=function(){if(!S.hist.length)return;S.cols=JSON.parse(S.hist.pop());refresh()};
+document.getElementById("rst").onclick=function(){apply(beads,PLAIN)};
+document.getElementById("rnd").onclick=function(){S.hist.push(JSON.stringify(S.cols));beads.forEach(function(b){S.cols[b.i]=COLORS[Math.floor(Math.random()*COLORS.length)]});refresh()};
+document.getElementById("png").onclick=function(){draw();var c2=document.createElement("canvas");c2.width=cv.width;c2.height=cv.height;var x=c2.getContext("2d");x.fillStyle="#faf6ef";x.fillRect(0,0,c2.width,c2.height);x.drawImage(cv,0,0);var a=document.createElement("a");a.download="my-bead-bag.png";a.href=c2.toDataURL("image/png");a.click()};
+build();size();
+</script>
+</html>
